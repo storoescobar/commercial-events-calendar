@@ -74,7 +74,34 @@ Columnas requeridas:
 - `store_id`
 - `created_at` (YYYY-MM-DD)
 
-### 3. Lógica de negocio principal
+#### `stores_mx.csv`
+
+Columnas requeridas:
+
+- `store_id`
+- `brand` (obligatorio; cada tienda pertenece a una sola marca)
+- `region`
+- `city`
+- `commercial`
+- `segment`
+- `ops_zone`
+- `gmv_last_30d` (numérico, obligatorio; no negativo)
+- `gmv_last_7d` (numérico, opcional; no negativo)
+
+#### `event_targets_mx.csv` (V3, opcional)
+
+Columnas: `event_id`, `store_id`. Una fila = una tienda elegible para un evento. Si no se carga, los eventos se tratan como "Open Event" (target_stores del CSV de eventos).
+
+### 3. Validación (V3)
+
+Al procesar los CSV se ejecuta una validación estricta:
+
+- **Errores bloqueantes** (impiden activar la carga): `event_id` o `store_id` duplicados; referencias a eventos o tiendas inexistentes; fechas inválidas; `campaign_id` duplicado; `store_id` duplicado en stores; `brand` faltante o vacío en stores; `gmv_last_30d` faltante, no numérico o negativo en stores.
+- **Advertencias** (no bloquean): `target_stores` distinto al conteo de `event_targets`; campañas con `created_at` fuera del rango del evento; eventos sin `event_targets` (Open Event); marca con tiendas objetivo en un evento pero sin campañas.
+
+Si hay errores bloqueantes, se muestra el **Validation Report** y no se activa la data hasta corregir.
+
+### 4. Lógica de negocio principal
 
 - Un evento aparece en un mes si:
 
@@ -91,7 +118,23 @@ Columnas requeridas:
   - `gap_stores`: `max(target_stores - stores_to_date, 0)`.
   - `days_to_start`: días (puede ser negativo) desde hoy a `start_date`.
 
-### 4. Vista Calendar
+**V3 – Fill rate:** Si el evento tiene `event_targets`, `target_stores` = conteo de targets para ese evento (respeta filtros). `fill_rate` = tiendas con promo / target_stores. La lógica de riesgo usa `fill_rate`. Sin targets se usa `event.target_stores` y se marca "Open Event".
+
+### 5. Filtros globales (V2)
+
+- Filtros por dimensión de tienda:
+  - Region
+  - City
+  - Ops Zone
+  - Commercial
+  - Segment
+- Comportamiento:
+  - Los filtros se aplican **tanto a la vista Calendar como a Table**.
+  - Se construye un subconjunto de tiendas (`filteredStores`) y solo se consideran campañas cuya `store_id` está en ese subconjunto.
+  - Las métricas por evento (`promos_to_date`, `stores_to_date`, `%`, gaps, riesgo) se recalculan en función de ese subconjunto filtrado.
+  - Si no se carga `stores_mx.csv`, los filtros se deshabilitan y la app funciona como en V1.
+
+### 6. Vista Calendar
 
 - Grid mensual.
 - Un evento se dibuja en todas las fechas que esté activo dentro del mes seleccionado.
@@ -105,7 +148,7 @@ Columnas requeridas:
   - Se muestran hasta **3 barras por día**.
   - Si hay más, aparece un botón **`+N más`** que abre un pequeño popover de lista (sin hover, solo click).
 
-### 5. Vista Table
+### 7. Vista Table
 
 - Columnas:
   - Event Name
@@ -143,3 +186,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ---
 
 **UX polish applied**: date labels en `Days to Start`, risk badges por nivel de cobertura de promos, y color coding en el calendario basado en `promos_pct`.
+
+**V2 filters & stores**: soporte de `stores_mx.csv`, filtros globales por dimensión de tienda y recálculo de métricas.
+
+**V3 Control Tower**: `event_targets_mx.csv`, validación estricta con reporte (errores/warnings), fill rate por targets, badges "Open Event", y drilldown Events → Event → City → Commercial → Brand → Store con métricas por nivel y breadcrumb. **V3.5**: dimensión Brand en la jerarquía; `stores_mx.csv` con columna `brand` obligatoria; pestaña Brands en EventDetail; CommercialDetail agrupa por Brand con badges de penetración; vista BrandDetail con tiendas y toggle "solo sin promo". **V4**: Executive Summary en EventDetail (fill rate, promos, GMV cobertura, top 3 ciudades/marcas); `stores_mx.csv` con `gmv_last_30d` (obligatorio) y `gmv_last_7d` (opcional); métricas GMV por evento y por marca; filtro global por Marca y búsqueda en dropdowns de filtros; Exportar tiendas sin promo (CSV) en CommercialDetail y BrandDetail; orden por GMV gap en tablas de marcas. **V4.1**: snapshots locales en localStorage (últimos 30 días o 2000 filas); deltas vs 48h y 7d (fill rate y GMV cobertura) en el Executive Summary; columnas GMV (objetivo, cubierto, cobertura %, gap) en tablas Ciudad y Comercial; deduplicación de snapshots dentro de 30 min por evento.
