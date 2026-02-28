@@ -125,6 +125,8 @@ const SAMPLE_CAMPAIGNS: CampaignCsvRow[] = [
 
 type ViewMode = "calendar" | "table";
 
+type RiskLevel = "none" | "risk" | "critical";
+
 type SortKey =
   | "default"
   | "name"
@@ -1028,16 +1030,16 @@ function TableView({ events, today }: TableViewProps) {
                   !timeline.isFinished &&
                   (e.daysToStart <= 7 || timeline.isOngoing);
 
-                let riskLevel: "none" | "risk" | "critical" = "none";
+                let riskLevel: RiskLevel = "none";
                 if (showRiskBadge) {
                   if (coverage < 0.1) {
-                    riskLevel = "Riesgo";
+                    riskLevel = "risk";
                   } else if (coverage < 0.3) {
                     riskLevel = "critical";
                   }
                 }
 
-                const isRisk = riskLevel === "Riesgo";
+                const isRisk = riskLevel === "risk";
                 const isCritical = riskLevel === "critical";
 
                 const gapPromosColor =
